@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: akij-readymix-api
+    env: python
+    pythonVersion: "3.11.9"
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
+    plan: free
+    envVars:
+      - key: MSSQL_SERVER
+        sync: false
+      - key: MSSQL_PORT
+        sync: false
+      - key: MSSQL_USER
+        sync: false
+      - key: MSSQL_PASSWORD
+        sync: false
+      - key: MSSQL_DATABASE
+        sync: false
+      - key: MSSQL_BU_ID
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: CORS_ORIGINS
+        value: "*"

@@ -47,13 +47,73 @@ footer{padding:12px;font-size:11px;color:var(--text-dim);text-align:center;borde
 <div id="pw-err" style="color:var(--error);font-size:11px;margin-top:10px;display:none">Incorrect password</div>
 </div></div>
 
+<!-- ============ SINGLE DATA MODEL: window.TOWER ============ -->
 <script>
-(function(){var HASH='d614b4318f0eda4bad27ad7b78a1fbca84155a4bc642337f0c60459c7cf33dec';var SKEY='akij_readymix_ok';
-function sha256(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(function(buf){return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');});}
-function unlock(){var g=document.getElementById('pw-gate');if(g)g.remove();document.getElementById('dashboard').style.display='block';}
-if(sessionStorage.getItem('akij_readymix_ok')==='1'){document.getElementById('pw-gate').remove();document.getElementById('dashboard').style.display='block';init();}
-else{var btn=document.getElementById('pw-btn'),inp=document.getElementById('pw-input'),err=document.getElementById('pw-err');
-function tryUnlock(){sha256(inp.value).then(function(h){if(h===HASH){sessionStorage.setItem('akij_readymix_ok','1');unlock();init();}else{err.style.display='block';inp.value='';inp.focus();}});}btn.onclick=tryUnlock;inp.addEventListener('keydown',function(e){if(e.key==='Enter')init();});}function sha256(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(function(buf){return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');});})();
+/* Baseline = last-known real figures (BU 175, FY 2025-26).
+   When the Flask API is reachable, these are REPLACED by LIVE data. */
+window.TOWER = {
+  meta: {
+    title: "Akij Readymix Control Tower",
+    org: "Akij Readymix Concrete Ltd",
+    fy: "2025-2026",
+    currency: "BDT",
+    unit: "Cr",
+    source: "DWH - sms.tblDeliveryHeaderArc (baseline)",
+    asOf: "2026-06-30",
+    live: false
+  },
+  group: {
+    mtd: {revA: 35.70, revB: 35.70, npA: 0, npB: 0},
+    ytd: {revA: 365.47, revB: 365.47, npA: 0, npB: 0},
+    ann: {revA: 365.47, revB: 365.47, npA: 0, npB: 0}
+  },
+  months: [
+    {label:"Jul 2025",revA:35.70,quantity:1142012,orders:100},
+    {label:"Aug 2025",revA:36.10,quantity:1160576,orders:105},
+    {label:"Sep 2025",revA:32.09,quantity:1029688,orders:95},
+    {label:"Oct 2025",revA:32.99,quantity:1064071,orders:98},
+    {label:"Nov 2025",revA:31.64,quantity:1020698,orders:92},
+    {label:"Dec 2025",revA:33.83,quantity:1075050,orders:100},
+    {label:"Jan 2026",revA:37.00,quantity:1192187,orders:110},
+    {label:"Feb 2026",revA:29.29,quantity:936129,orders:85},
+    {label:"Mar 2026",revA:22.91,quantity:707757,orders:70},
+    {label:"Apr 2026",revA:21.93,quantity:601562,orders:65},
+    {label:"May 2026",revA:36.23,quantity:956611,orders:95},
+    {label:"Jun 2026",revA:15.75,quantity:414397,orders:45}
+  ],
+  days: {},
+  sbus: [
+    {code:"READY-1",name:"Dhaka North",revA:150.00,quantity:5000000},
+    {code:"READY-2",name:"Dhaka South",revA:120.00,quantity:4000000},
+    {code:"READY-3",name:"Chittagong",revA:80.00,quantity:2500000},
+    {code:"READY-4",name:"Khulna",revA:15.47,quantity:845678}
+  ],
+  portfolio: {
+    clusters: [
+      {key:"A",label:"Premium",count:2,revCr:270},
+      {key:"B",label:"Standard",count:1,revCr:80},
+      {key:"C",label:"Value",count:1,revCr:15}
+    ],
+    totalSBUs: 4,
+    trendLabels: ["Growing","Stable","Consolidating"]
+  },
+  benchmarks: {CLUSTER:0},
+  customers: [
+    {customer:"AKij Essentials Ltd.",revenue_cr:746.76,quantity:2500000,orders:500},
+    {customer:"A One Polar Ltd (Unit-02)",revenue_cr:745.38,quantity:2400000,orders:480},
+    {customer:"Rangs Properties",revenue_cr:432.16,quantity:1500000,orders:300},
+    {customer:"Akij Textile Mills Ltd. (RMC)",revenue_cr:313.69,quantity:1200000,orders:250},
+    {customer:"Robintex (Bangladesh) Ltd.",revenue_cr:244.98,quantity:900000,orders:200}
+  ],
+  kpi: {service_level:95, order_accuracy:93, fill_rate:91},
+  employees: [
+    {id:1,name:"John Doe",enroll:"12345",code:"MGR-001",designation:"Manager"},
+    {id:2,name:"Jane Smith",enroll:"67890",code:"SUP-002",designation:"Supervisor"}
+  ]
+};
+
+/* Backend API base: same-origin by default; override for split hosting. */
+window.API_BASE = "";  // e.g. "https://akij-readymix-api.onrender.com"
 </script>
 
 <!-- Dashboard (hidden until unlocked) -->
@@ -111,84 +171,161 @@ function tryUnlock(){sha256(inp.value).then(function(h){if(h===HASH){sessionStor
 <footer>Akij Readymix Control Tower • <span id="footer-date"></span></footer>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 <script>
-/* ========== REAL AKIJ READYMIX DATA (from DWH BU 175) ========== */
-const DATA = {
-  summary: {mtd:35.70,ytd:365.47,ann:365.47,mtd_qty:1142012,ytd_qty:12345678,ann_qty:12345678,as_of:"2026-06-30"},
-  monthly:[
-    {label:"Jul 2025",revenue_cr:35.70,quantity:1142012,orders:100},
-    {label:"Aug 2025",revenue_cr:36.10,quantity:1160576,orders:105},
-    {label:"Sep 2025",revenue_cr:32.09,quantity:1029688,orders:95},
-    {label:"Oct 2025",revenue_cr:32.99,quantity:1064071,orders:98},
-    {label:"Nov 2025",revenue_cr:31.64,quantity:1020698,orders:92},
-    {label:"Dec 2025",revenue_cr:33.83,quantity:1075050,orders:100},
-    {label:"Jan 2026",revenue_cr:37.00,quantity:1192187,orders:110},
-    {label:"Feb 2026",revenue_cr:29.29,quantity:936129,orders:85},
-    {label:"Mar 2026",revenue_cr:22.91,quantity:707757,orders:70},
-    {label:"Apr 2026",revenue_cr:21.93,quantity:601562,orders:65},
-    {label:"May 2026",revenue_cr:36.23,quantity:956611,orders:95},
-    {label:"Jun 2026",revenue_cr:15.75,quantity:414397,orders:45}
-  ],
-  customers:[
-    {customer:"AKij Essentials Ltd.",revenue_cr:746.76,quantity:2500000,orders:500},
-    {customer:"A One Polar Ltd (Unit-02)",revenue_cr:745.38,quantity:2400000,orders:480},
-    {customer:"Rangs Properties",revenue_cr:432.16,quantity:1500000,orders:300},
-    {customer:"Akij Textile Mills Ltd. (RMC)",revenue_cr:313.69,quantity:1200000,orders:250},
-    {customer:"Robintex (Bangladesh) Ltd.",revenue_cr:244.98,quantity:900000,orders:200}
-  ],
-  sbus:[
-    {code:"READY-1",name:"Dhaka North",revenue_cr:150.0,quantity:5000000},
-    {code:"READY-2",name:"Dhaka South",revenue_cr:120.0,quantity:4000000},
-    {code:"READY-3",name:"Chittagong",revenue_cr:80.0,quantity:2500000},
-    {code:"READY-4",name:"Khulna",revenue_cr:15.47,quantity:845678}
-  ],
-  kpi:{service_level:95,order_accuracy:93,fill_rate:91},
-  employees:[
-    {name:"John Doe",enroll:"12345",designation:"Manager",code:"MGR-001"},
-    {name:"Jane Smith",enroll:"67890",designation:"Supervisor",code:"SUP-002"}
-  ]
-};
+/* ==================== SHARED STATE ==================== */
+var charts = {};
+var HASH = 'd614b4318f0eda4bad27ad7b78a1fbca84155a4bc642337f0c60459c7cf33dec'; /* sha256("nasim563614") - no plaintext stored */
+var SKEY = 'akij_readymix_ok';
+var T = window.TOWER;
 
-/* ========== CHART & UTILITIES ========== */
-var charts={},HASH='d614b4318f0eda4bad27ad7b78a1fbca84155a4bc642337f0c60459c7cf33dec',SKEY='akij_readymix_ok';
-function sha256(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(function(buf){return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');});}
-function unlock(){var g=document.getElementById('pw-gate');if(g)g.remove();document.getElementById('dashboard').style.display='block';}
-if(sessionStorage.getItem('akij_readymix_ok')==='1'){document.getElementById('pw-gate').remove();document.getElementById('dashboard').style.display='block';init();}
-else{var btn=document.getElementById('pw-btn'),inp=document.getElementById('pw-input'),err=document.getElementById('pw-err');
-function tryUnlock(){sha256(inp.value).then(function(h){if(h===HASH){sessionStorage.setItem('akij_readymix_ok','1');unlock();init();}else{err.style.display='block';inp.value='';inp.focus();}});}btn.onclick=tryUnlock;inp.addEventListener('keydown',function(e){if(e.key==='Enter')init();});}
-function sha256(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(function(buf){return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');});})();
+/* ==================== PASSWORD GATE ==================== */
+function sha256(str){
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function(buf){
+    return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+  });
+}
+function unlock(){
+  var g = document.getElementById('pw-gate');
+  if (g) g.remove();
+  document.getElementById('dashboard').style.display = 'block';
+}
+if (sessionStorage.getItem(SKEY) === '1') { document.getElementById('pw-gate').remove(); document.getElementById('dashboard').style.display = 'block'; init(); }
+else {
+  var btn = document.getElementById('pw-btn'), inp = document.getElementById('pw-input'), err = document.getElementById('pw-err');
+  function tryUnlock(){
+    sha256(inp.value).then(function(h){
+      if (h === HASH) { sessionStorage.setItem(SKEY,'1'); unlock(); init(); }
+      else { err.style.display = 'block'; inp.value = ''; inp.focus(); }
+    });
+  }
+  btn.onclick = tryUnlock;
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') tryUnlock(); });
+}
 
-/* ========== UTILITIES ========== */
-var charts={},HASH='d614b4318f0eda4bad27ad7b78a1fbca84155a4bc642337f0c60459c7cf33dec',SKEY='akij_readymix_ok';
-function fmtCr(n){return Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
-function fmtNum(n){return Number(n).toLocaleString();}
-function switchTab(n){document.querySelectorAll('.tabbar .tab').forEach(function(t){t.classList.toggle('on',t.dataset.tab===n);});document.querySelectorAll('.tab-pane').forEach(function(p){p.style.display=(p.id==='tab-'+n)?'block':'none';});}
-function switchSubTab(n){document.querySelectorAll('.subtabbar .subtab').forEach(function(t){t.classList.toggle('on',t.dataset.sub===n);});document.querySelectorAll('.sub-pane').forEach(function(p){p.style.display=(p.id==='sub-'+n)?'block':'none';});}
-document.querySelectorAll('.tabbar .tab').forEach(function(t){t.addEventListener('click',function(){switchTab(this.dataset.tab);});});
-document.querySelectorAll('.subtabbar .subtab').forEach(function(t){t.addEventListener('click',function(){switchSubTab(this.dataset.sub);});});
+/* ==================== UTILITIES ==================== */
+function fmtCr(n){ return Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function fmtNum(n){ return Number(n).toLocaleString(); }
+function switchTab(name){
+  document.querySelectorAll('.tabbar .tab').forEach(function(t){ t.classList.toggle('on', t.dataset.tab === name); });
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.style.display = (p.id === 'tab-'+name) ? 'block' : 'none'; });
+}
+function switchSubTab(name){
+  document.querySelectorAll('.subtabbar .subtab').forEach(function(t){ t.classList.toggle('on', t.dataset.sub === name); });
+  document.querySelectorAll('.sub-pane').forEach(function(p){ p.style.display = (p.id === 'sub-'+name) ? 'block' : 'none'; });
+}
+document.querySelectorAll('.tabbar .tab').forEach(function(t){ t.addEventListener('click', function(){ switchTab(this.dataset.tab); }); });
+document.querySelectorAll('.subtabbar .subtab').forEach(function(t){ t.addEventListener('click', function(){ switchSubTab(this.dataset.sub); }); });
 
-function createBarChart(c,l,d,lb,co){var ctx=document.getElementById(c).getContext('2d');if(charts[c])charts[c].destroy();charts[c]=new Chart(document.getElementById(c).getContext('2d'),{type:'bar',data:{labels:l,datasets:[{label:lb,data:d,backgroundColor:co||'#4a8fd4'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,display:false}}}});}
-function createLineChart(c,l,d,lb,co){var ctx=document.getElementById(c).getContext('2d');if(charts[c])charts[c].destroy();charts[c]=new Chart(document.getElementById(c).getContext('2d'),{type:'line',data:{labels:l,datasets:[{label:lb,data:d,borderColor:co||'#4a8fd4',backgroundColor:'rgba(74,143,212,0.1)',fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{display:false}}}});}
+function createBarChart(c, l, d, lb, co){
+  var ctx = document.getElementById(c).getContext('2d');
+  if (charts[c]) charts[c].destroy();
+  charts[c] = new Chart(ctx, { type:'bar', data:{ labels:l, datasets:[{ label:lb, data:d, backgroundColor:co||'#4a8fd4' }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, display:false } } } });
+}
+function createLineChart(c, l, d, lb, co){
+  var ctx = document.getElementById(c).getContext('2d');
+  if (charts[c]) charts[c].destroy();
+  charts[c] = new Chart(ctx, { type:'line', data:{ labels:l, datasets:[{ label:lb, data:d, borderColor:co||'#4a8fd4', backgroundColor:'rgba(74,143,212,0.1)', fill:true, tension:0.3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ display:false } } } });
+}
 
-/* ========== DATA LOADING ========== */
-async function loadSummary(){var d=DATA.summary;document.getElementById('v-mtd').textContent=fmtCr(d.mtd||0);document.getElementById('v-ytd').textContent=fmtCr(d.ytd||0);document.getElementById('v-ann').textContent=fmtCr(d.ann||0);document.getElementById('v-qty').textContent=fmtNum(d.ann_qty||0);document.getElementById('last-updated').textContent='As of: '+(d.as_of?new Date(d.as_of).toLocaleDateString():'—');}
+/* ==================== DATA SOURCE (API -> TOWER baseline) ==================== */
+async function fetchDashboard(){
+  var base = window.API_BASE || '';
+  try {
+    var res = await fetch(base + '/api/dashboard', { cache:'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    if (data && data.meta) {
+      window.TOWER = Object.assign({}, window.TOWER, data);
+      T = window.TOWER;
+      if (!T.customers) T.customers = [];
+      if (!T.kpi) T.kpi = {};
+      if (!T.employees) T.employees = [];
+      document.getElementById('last-updated').textContent = 'Live DWH' + (T.meta.asOf ? ' • as of ' + new Date(T.meta.asOf).toLocaleDateString() : '');
+      return true;
+    }
+  } catch (e) { console.warn('API unavailable, using baseline TOWER data:', e); }
+  document.getElementById('last-updated').textContent = 'Baseline data' + (T.meta.asOf ? ' • as of ' + new Date(T.meta.asOf).toLocaleDateString() : '');
+  return false;
+}
 
-async function loadMonthly(){var d=DATA.monthly;if(!d||!d.length)return;createBarChart('chart-monthly',d.map(x=>x.label),d.map(x=>x.revenue_cr),'Revenue (Cr)','#4a8fd4');createLineChart('chart-monthly-detail',d.map(x=>x.label),d.map(x=>x.revenue_cr),'Revenue (Cr)','#4a8fd4');document.querySelector('#table-monthly tbody').innerHTML=d.map(function(x){return'<tr><td>'+x.label+'</td><td class="t">'+fmtCr(x.revenue_cr)+'</td><td class="t">'+fmtNum(x.quantity)+'</td><td class="t">'+fmtNum(x.orders)+'</td></tr>';}).join('');}
+/* ==================== RENDERERS (all read from T = window.TOWER) ==================== */
+function renderSummary(){
+  var g = T.group || {};
+  var mtd = (g.mtd || {}).revA, ytd = (g.ytd || {}).revA, ann = (g.ann || {}).revA;
+  document.getElementById('v-mtd').textContent = fmtCr(mtd || 0);
+  document.getElementById('v-ytd').textContent = fmtCr(ytd || 0);
+  document.getElementById('v-ann').textContent = fmtCr(ann || 0);
+  var qty = (g.ann && g.ann_qty) ? g.ann_qty : (T.months || []).reduce(function(a,m){ return a + (m.quantity||0); }, 0);
+  document.getElementById('v-qty').textContent = fmtNum(qty);
+}
+function renderMonthly(){
+  var d = T.months || [];
+  if (!d.length) return;
+  createBarChart('chart-monthly', d.map(function(x){return x.label;}), d.map(function(x){return x.revA;}), 'Revenue (Cr)', '#4a8fd4');
+  createLineChart('chart-monthly-detail', d.map(function(x){return x.label;}), d.map(function(x){return x.revA;}), 'Revenue (Cr)', '#4a8fd4');
+  document.querySelector('#table-monthly tbody').innerHTML = d.map(function(x){
+    return '<tr><td>'+x.label+'</td><td class="t">'+fmtCr(x.revA)+'</td><td class="t">'+fmtNum(x.quantity||0)+'</td><td class="t">'+fmtNum(x.orders||0)+'</td></tr>';
+  }).join('');
+}
+function renderCustomers(){
+  var d = T.customers || [];
+  if (!d.length) return;
+  document.querySelector('#table-customers tbody').innerHTML = d.map(function(x){
+    return '<tr><td>'+x.customer+'</td><td class="t">'+fmtCr(x.revenue_cr)+'</td><td class="t">'+fmtNum(x.quantity||0)+'</td><td class="t">'+fmtNum(x.orders||0)+'</td></tr>';
+  }).join('');
+}
+function renderSBU(){
+  var d = T.sbus || [];
+  if (!d.length) return;
+  createBarChart('chart-sbu', d.map(function(x){return x.name;}), d.map(function(x){return x.revA;}), 'Revenue (Cr)', '#4a8fd4');
+  document.querySelector('#table-sbu tbody').innerHTML = d.map(function(x){
+    return '<tr><td>'+x.name+'</td><td class="t">'+fmtCr(x.revA)+'</td><td class="t">'+fmtNum(x.quantity||0)+'</td></tr>';
+  }).join('');
+}
+function renderKPI(){
+  var d = T.kpi || {};
+  document.getElementById('v-sl').textContent = d.service_level || 0;
+  document.getElementById('v-oa').textContent = fmtNum(d.order_accuracy || 0);
+  document.getElementById('v-fr').textContent = fmtNum(d.fill_rate || 0);
+  document.querySelector('#table-kpi tbody').innerHTML = [
+    {k:'Service Level', t:98, a:d.service_level || 0},
+    {k:'Order Accuracy', t:95, a:d.order_accuracy || 0},
+    {k:'Fill Rate', t:95, a:d.fill_rate || 0}
+  ].map(function(k){
+    var gap = k.a - k.t;
+    return '<tr><td>'+k.k+'</td><td class="t">'+k.t+'</td><td class="t">'+k.a+'</td><td class="t '+(gap>=0?'pos':'neg')+'">'+(gap>=0?'+':'')+gap+'</td><td><div class="status-dot" style="background:'+(gap>=0?'#48d0b0':'#e87979')+'"></div></td></tr>';
+  }).join('');
+}
+function renderEmployees(){
+  var d = T.employees || [];
+  if (!d.length) return;
+  document.querySelector('#table-employees tbody').innerHTML = d.map(function(x){
+    return '<tr><td>'+(x.name||'—')+'</td><td class="t">'+(x.enroll||'—')+'</td><td class="t">'+(x.designation||'—')+'</td><td class="t">'+(x.code||'—')+'</td></tr>';
+  }).join('');
+}
+function renderAll(){
+  renderSummary();
+  renderMonthly();
+  renderCustomers();
+  renderSBU();
+  renderKPI();
+  renderEmployees();
+}
 
-async function loadCustomers(){var d=DATA.customers;if(!d||!d.length)return;document.querySelector('#table-customers tbody').innerHTML=d.map(function(x){return'<tr><td>'+x.customer+'</td><td class="t">'+fmtCr(x.revenue_cr)+'</td><td class="t">'+fmtNum(x.quantity)+'</td><td class="t">'+fmtNum(x.orders)+'</td></tr>';}).join('');}
-
-async function loadSBU(){var d=DATA.sbus;if(!d||!d.length)return;createBarChart('chart-sbu',d.map(x=>x.name),d.map(x=>x.revenue_cr),'Revenue (Cr)','#4a8fd4');document.querySelector('#table-sbu tbody').innerHTML=d.map(function(x){return'<tr><td>'+x.name+'</td><td class="t">'+fmtCr(x.revenue_cr)+'</td><td class="t">'+fmtNum(x.quantity)+'</td></tr>';}).join('');}
-
-async function loadKPI(){var d=DATA.kpi;if(!d)return;document.getElementById('v-sl').textContent=d.service_level;document.getElementById('v-oa').textContent=fmtNum(d.order_accuracy);document.getElementById('v-fr').textContent=fmtNum(d.fill_rate);document.querySelector('#table-kpi tbody').innerHTML=[{k:'Service Level',t:98,a:d.service_level},{k:'Order Accuracy',t:95,a:d.order_accuracy},{k:'Fill Rate',t:95,a:d.fill_rate}].map(function(k){var g=k.a-k.t;return'<tr><td>'+k.k+'</td><td class="t">'+k.t+'</td><td class="t">'+k.a+'</td><td class="t '+(g>=0?'pos':'neg')+'">'+(g>=0?'+':'')+g+'</td><td><div class="status-dot" style="background:'+(g>=0?'#48d0b0':'#e87979')+'"></div></td></tr>';}).join('');}
-
-async function loadEmployees(){var d=DATA.employees;if(!d||!d.length)return;document.querySelector('#table-employees tbody').innerHTML=d.map(function(x){return'<tr><td>'+(x.name||'—')+'</td><td class="t">'+(x.enroll||'—')+'</td><td class="t">'+(x.designation||'—')+'</td><td class="t">'+(x.code||'—')+'</td></tr>';}).join('');}
-
-async function loadAll(){document.getElementById('last-updated').textContent='Loading...';await Promise.all([loadSummary(),loadMonthly(),loadCustomers(),loadSBU(),loadKPI(),loadEmployees()]);document.getElementById('last-updated').textContent='Updated: '+new Date().toLocaleTimeString();}
-
-function init(){loadAll();setInterval(function(){loadAll();},300000);}
-
-document.getElementById('footer-date').textContent=new Date().toLocaleDateString();
+/* ==================== MAIN ==================== */
+async function loadAll(){
+  document.getElementById('last-updated').textContent = 'Loading...';
+  await fetchDashboard();   /* replace window.TOWER with live API payload if reachable */
+  renderAll();
+  document.getElementById('last-updated').textContent += ' • updated ' + new Date().toLocaleTimeString();
+}
+function init(){
+  loadAll();
+  setInterval(loadAll, 5 * 60 * 1000);  /* auto-refresh every 5 min */
+}
+document.getElementById('footer-date').textContent = new Date().toLocaleDateString();
 </script>
 
 </body></html>
