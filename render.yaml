@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: akij-readymix-control-tower
-    env: static
-    buildCommand: ""  # Empty - no build needed
-    startCommand: ""  # Empty - no server needed
-    envVars: {}
-    plan: free
