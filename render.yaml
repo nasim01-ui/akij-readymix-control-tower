@@ -1,11 +1,25 @@
-# Render Blueprint - automatically creates BOTH services on deploy.
+# Render Blueprint - fully automated deployment for Akij Readymix Control Tower.
+#
+# How it works:
+#   Render -> New + -> Blueprint -> select nasim01-ui/akij-readymix-control-tower
+#              (branch: main)
+#   Render automatically creates BOTH services below from this file.
+#   Commit & push to main -> auto re-deploys both services
+#   (autoDeploy defaults to "yes" / commit trigger for Blueprint services).
+#
+# SECURITY:
+#   All secrets use "sync: false" -> Render never reads them from git.
+#   You enter their VALUES once in the Render dashboard
+#   (service -> Environment). Nothing secret is stored in this repo.
 
 services:
-  # ==================== Backend API ====================
+  # ============================================================
+  # 1) BACKEND API
+  # ============================================================
   - type: web
     name: akij-readymix-api
     runtime: python
-    pythonVersion: "3.11.9"   # pinned to match .python-version; avoids pyodbc build failures on 3.13+/3.14
+    pythonVersion: "3.11.9"
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
@@ -13,7 +27,7 @@ services:
     plan: free
     envVars:
       - key: MSSQL_SERVER
-        sync: false          # set the value in Render dashboard, never commit
+        sync: false
       - key: MSSQL_PORT
         sync: false
       - key: MSSQL_USER
@@ -31,12 +45,14 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  # ==================== Frontend Static Site ====================
-  - type: static
+  # ============================================================
+  # 2) FRONTEND STATIC SITE
+  # ============================================================
+  - type: static_site
     name: akij-readymix-dashboard
     rootDir: frontend
-    buildCommand: ""          # pure HTML - no build step
-    publishPath: .
+    buildCommand: ""           # pure HTML - no build step
+    staticPublishPath: .
     envVars:
       - key: API_BASE
         value: "https://akij-readymix-api.onrender.com"
