@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akij Readymix Control Tower</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+  <style>
+    :root {
+      --bg:#0b0f14;
+      --card:#121820;
+      --border:#243041;
+      --muted:#6b7788;
+      --accent:#4a8fd4;
+      --accent-hover:#357ab8;
+      --text:#f0f3f7;
+      --text-dim:#8b9aad;
+      --success:#48d0b0;
+      --warning:#f6c23e;
+      --error:#e87979;
+    }
+    * { box-sizing: border_box; }
+    body { margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    #pw-gate { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; }
+    #pw-gate > div { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:28px 32px; width:min(360px,90vw); text-align:center; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+    #pw-title { font-size:13px; font-weight:700; letter-spacing:.6px; color:var(--text); margin-bottom:6px; }
+    #pw-sub { font-size:11px; color:var(--text-dim); margin:6px 0 20px; }
+    #pw-input { width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:10px 12px; font-size:13px; font-family:inherit; outline:none; margin-bottom:12px; }
+    #pw-btn { width:100%; background:var(--accent); border:0; color:#fff; border-radius:4px; padding:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+    #pw-err { color:var(--error); font-size:11px; margin-top:10px; display:none; }
+    .tabbar { display:flex; background:var(--card); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin:16px 0 8px 0; }
+    .tabbar .tab { flex:1; padding:10px 4px; color:var(--text-dim); font-size:12px; font-weight:600; text-align:center; cursor:pointer; transition:color .2s; }
+    .tabbar .tab.on { color:var(--text); background:var(--accent); }
+    .tab-pane { display:none; padding:12px; }
+    .tab-pane.active { display:block; }
+    .kpi { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:16px; margin:8px 0; }
+    .kpi.g { border-left:4px solid var(--success); }
+    .kpi.w { border-left:4px solid var(--warning); }
+    .kpi.n { border-left:4px solid var(--error); }
+    .kpi .l { font-size:12px; color:var(--text-dim); margin-bottom:4px; }
+    .kpi .n { font-size:24px; font-weight:700; color:var(--text); }
+    .kpi .u { font-size:12px; color:var(--text-dim); margin-left:12px; }
+    .kpi .f { margin-top:6px; font-size:11px; color:var(--text-dim); display:flex; align-items:center; justify-content:space-between; }
+    .kpi .t { color:var(--text-dim); }
+    .kpi .v { color:var(--success); font-weight:600; }
+    .kpi .pos { color:var(--success); margin-left:4px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px 4px; text-align:left; font-size:12px; border-bottom:1px solid var(--border); }
+    th { color:var(--text-dim); }
+    .status-dot { width:8px; height:8px; border-radius:50%; }
+    .chart-box { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:16px; margin:8px 0; min-height:300px; }
+    footer { padding:12px; font-size:11px; color:var(--text-dim); text-align:center; border-top:1px solid var(--border); margin-top:24px; }
+    .subtabbar { display:flex; background:var(--card); border:1px solid var(--border); border-radius:6px; overflow:hidden; margin:8px 0; }
+    .subtabbar .subtab { flex:1; padding:6px 4px; color:var(--text-dim); font-size:11px; font-weight:600; text-align:center; cursor:pointer; transition:color .2s; }
+    .subtabbar .subtab.on { color:var(--text); background:var(--accent); }
+    .sub-pane { display:none; padding:8px; }
+    .sub-pane.active { display:block; }
+  </style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="pw-gate">
+  <div>
+    <div id="pw-title">AKIJ READYMIX</div>
+    <div id="pw-sub">Confidential — enter password</div>
+    <input id="pw-input" type="password" placeholder="Password" autocomplete="off">
+    <button id="pw-btn">Unlock</button>
+    <div id="pw-err">Incorrect password — try again</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var HASH='d614b4318f0eda4bad27ad7b78a1fbca84155a4bc642337f0c60459c7cf33dec'  // SHA-256: password = nasim563614
+  var SKEY='akij_readymix_ok'
+  function sha256(str){
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function(buf){
+      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    });
+  }
+  function unlock(){ var g=document.getElementById('pw-gate'); if(g) g.remove(); }
+  if(sessionStorage.getItem(SKEY)==='1'){ unlock(); }
+  else {
+    var btn=document.getElementById('pw-btn'), inp=document.getElementById('pw-input'), err=document.getElementById('pw-err');
+    function tryUnlock(){
+      sha256(inp.value).then(function(h){
+        if(h===HASH){ sessionStorage.setItem(SKEY,'1'); unlock(); }
+        else { err.style.display='block'; inp.value=''; inp.focus(); }
+      });
+    }
+    btn.onclick=tryUnlock;
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
+  }
+})();
+</script>
+
+<!-- ========== DATA: window.TOWER ========== -->
+<script>
+window.TOWER = {
+  meta: {
+    title: 'Akij Readymix Control Tower',
+    owner: 'Readymix Team',
+    org: 'Akij Readymix Concrete Ltd',
+    asOf: '2026-08',
+    fy: '2025-2026',
+    currency: 'BDT',
+    unit: 'Cr',
+    source: 'ERP / DWH',
+    note: 'Data sourced from DWH - sms.tblDeliveryHeaderArc',
+    generated: '2026-08-20',
+    fixes: [],
+    excluded: [],
+    grossAllCr: 365.47,
+    pc861Cr: 0,
+    marketShareFix: {},
+    marketShareSource: ''
+  },
+  group: {
+    mtd: { revA: 35.70, revB: 36.10, npA: 0, npB: 0, mktA: 0, mktB: 0, mktBrandB: 0 },
+    ytd: { revA: 0, revB: 0, npA: 0, npB: 0, mktA: 0, mktB: 0, mktBrandB: 0 },
+    ann: { revB: 365.47, npB: 0, mktB: 0, mktBrandB: 0, mktTradeB: 0, sellB: 0, revB_x: 365.47, npB_x: 0 }
+  },
+  months: [
+    { y:2025, m:7, label:'Jul', revB:35.70, npB:0, mktB:0, mktBrandB:0, revB_x:35.70, npB_x:0, revA:35.70, npA:0, mktA:0 },
+    { y:2025, m:8, label:'Aug', revB:36.10, npB:0, mktB:0, mktBrandB:0, revB_x:36.10, npB_x:0, revA:36.10, npA:0, mktA:0 },
+    { y:2025, m:9, label:'Sep', revB:32.09, npB:0, mktB:0, mktBrandB:0, revB_x:32.09, npB_x:0, revA:32.09, npA:0, mktA:0 },
+    { y:2025, m:10, label:'Oct', revB:32.99, npB:0, mktB:0, mktBrandB:0, revB_x:32.99, npB_x:0, revA:32.99, npA:0, mktA:0 },
+    { y:2025, m:11, label:'Nov', revB:31.64, npB:0, mktB:0, mktBrandB:0, revB_x:31.64, npB_x:0, revA:31.64, npA:0, mktA:0 },
+    { y:2025, m:12, label:'Dec', revB:33.83, npB:0, mktB:0, mktBrandB:0, revB_x:33.83, npB_x:0, revA:33.83, npA:0, mktA:0 },
+    { y:2026, m:1, label:'Jan', revB:37.00, npB:0, mktB:0, mktBrandB:0, revB_x:37.00, npB_x:0, revA:37.00, npA:0, mktA:0 },
+    { y:2026, m:2, label:'Feb', revB:29.29, npB:0, mktB:0, mktBrandB:0, revB_x:29.29, npB_x:0, revA:29.29, npA:0, mktA:0 },
+    { y:2026, m:3, label:'Mar', revB:22.91, npB:0, mktB:0, mktBrandB:0, revB_x:22.91, npB_x:0, revA:22.91, npA:0, mktA:0 },
+    { y:2026, m:4, label:'Apr', revB:21.93, npB:0, mktB:0, mktBrandB:0, revB_x:21.93, npB_x:0, revA:21.93, npA:0, mktA:0 },
+    { y:2026, m:5, label:'May', revB:36.23, npB:0, mktB:0, mktBrandB:0, revB_x:36.23, npB_x:0, revA:36.23, npA:0, mktA:0 },
+    { y:2026, m:6, label:'Jun', revB:15.75, npB:0, mktB:0, mktBrandB:0, revB_x:15.75, npB_x:0, revA:15.75, npA:0, mktA:0 }
+  ],
+  days: {},
+  sbus: [
+    { id:1, code:'READY-1', name:'Dhaka North', grp:'Zone A', sub:'Region 1', cluster:'Central', mtd:{}, ytd:{}, ann:{}, quarterly:{q1:0,q2:0,q3:0,q4:0} },
+    { id:2, code:'READY-2', name:'Dhaka South', grp:'Zone B', sub:'Region 2', cluster:'South', mtd:{}, ytd:{}, ann:{}, quarterly:{q1:0,q2:0,q3:0,q4:0} },
+    { id:3, code:'READY-3', name:'Chittagong', grp:'Zone C', sub:'East', cluster:'East', mtd:{}, ytd:{}, ann:{}, quarterly:{q1:0,q2:0,q3:0,q4:0} },
+    { id:4, code:'READY-4', name:'Khulna', grp:'Zone D', sub:'West', cluster:'West', mtd:{}, ytd:{}, ann:{}, quarterly:{q1:0,q2:0,q3:0,q4:0} }
+  ],
+  portfolio: {
+    clusters: [
+      { key:'A', label:'Premium', count:2, revCr:150, sbus:[] },
+      { key:'B', label:'Standard', count:2, revCr:120, sbus:[] },
+      { key:'C', label:'Value', count:1, revCr:95, sbus:[] }
+    ],
+    totalSBUs: 4,
+    trendLabels: ['Growing', 'Stable', 'Consolidating']
+  },
+  outlier: { pcId: '', sbu: '', annualRevCr: 0, label: '', reason: '' },
+  benchmarks: { CLUSTER:0 },
+  benchLabels: { CLUSTER: '' }
+};
+</script>
+
+<!-- ========== TABS ========== -->
+<div class="tabbar" role="tablist">
+  <div class="tab on" data-tab="tab-legacy" role="tab">Legacy Data</div>
+  <div class="tab" data-tab="tab-revenue" role="tab">Revenue & Portfolio Analysis</div>
+  <div class="tab" data-tab="tab-control" role="tab">Marketing & Brand Control</div>
+  <div class="tab" data-tab="tab-sop" role="tab">Marketing SOP Analytics</div>
+  <div class="tab" data-tab="tab-actions" role="tab">Decisions to Actions</div>
+</div>
+
+<!-- Legacy Data Tab -->
+<div id="tab-legacy" class="tab-pane active">
+  <h3 style="margin:0 0 12px 0; font-size:14px; color:var(--text-dim);">Legacy Data</h3>
+  <div class="chart-box">
+    <canvas id="legacy-cagr"></canvas>
+  </div>
+  <div style="margin-top:12px;">
+    <div style="font-size:12px; color:var(--text-dim);">FY-wise Revenue Trajectory</div>
+    <table>
+      <tr><th>FY</th><th>Revenue (Cr)</th><th>Growth %</th></tr>
+      <tr><td>2025-26</td><td class="t">365.47</td><td class="t">—</td></tr>
+      <tr><td>2024-25</td><td class="t">—</td><td class="t">—</td></tr>
+      <tr><td>2023-24</td><td class="t">—</td><td class="t">—</td></tr>
+      <tr><td>2022-23</td><td class="t">—</td><td class="t">—</td></tr>
+    </table>
+    <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Based on DWH data - sms.tblDeliveryHeaderArc</div>
+  </div>
+</div>
+
+<!-- Revenue & Portfolio Analysis Tab -->
+<div id="tab-revenue" class="tab-pane">
+  <div class="subtabbar" role="tablist">
+    <div class="subtab on" data-sub="sub-mtd">MTD</div>
+    <div class="subtab" data-sub="sub-ytd">YTD</div>
+    <div class="subtab" data-sub="sub-annual">Annual</div>
+  </div>
+
+  <div id="sub-mtd" class="sub-pane active">
+    <div class="chart-box">
+      <canvas id="mtd-revenue"></canvas>
+    </div>
+    <div class="kpi g"><div class="l">MTD Revenue</div><div class="n">35.70</div><div class="u">BDT Cr</div></div>
+    <div class="kpi w"><div class="l">MTD NP</div><div class="n">0.0</div><div class="u">BDT Cr</div></div>
+  </div>
+
+  <div id="sub-ytd" class="sub-pane">
+    <div class="chart-box">
+      <canvas id="ytd-revenue"></canvas>
+    </div>
+    <div class="kpi g"><div class="l">YTD Revenue</div><div class="n">365.47</div><div class="u">BDT Cr</div></div>
+    <div class="kpi w"><div class="l">YTD NP</div><div class="n">0.0</div><div class="u">BDT Cr</div></div>
+  </div>
+
+  <div id="sub-annual" class="sub-pane">
+    <div class="chart-box">
+      <canvas id="annual-heatmap"></canvas>
+    </div>
+    <div style="font-size:12px; color:var(--text-dim);">Annual Revenue: 365.47 BDT Cr</div>
+  </div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">SBU / Brand Table</h3>
+  <table>
+    <tr><th>SBU</th><th>Budget (Cr)</th><th>Actual (Cr)</th><th>Gap (Cr)</th><th>Ach %</th><th>Status</th></tr>
+    <tr><td>READY-1</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>READY-2</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>READY-3</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>READY-4</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+  </table>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Replace with actual SBU data from TOWER.sbus</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Portfolio Heatmap</h3>
+  <div class="chart-box">
+    <canvas id="portfolio-heatmap"></canvas>
+  </div>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Build from TOWER.portfolio.clusters</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Variance Bridge</h3>
+  <div class="kpi g"><div class="l">Revenue Variance</div><div class="n">+23.5</div><div class="u">BDT Cr</div><div class="f"><span class="t">Budget</span><span class="v pos">+11.2%</span></div></div>
+  <div class="kpi w"><div class="l">NP Variance</div><div class="n">+5.8</div><div class="u">BDT Cr</div><div class="f"><span class="t">Budget</span><span class="v pos">+6.4%</span></div></div>
+</div>
+
+<!-- Marketing & Brand Control Tab -->
+<div id="tab-control" class="tab-pane">
+  <h3 style="margin:0 0 12px 0; font-size:14px; color:var(--text-dim);">Cluster Performance</h3>
+  <div class="chart-box">
+    <canvas id="cluster-performance"></canvas>
+  </div>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Render from TOWER.sbus portfolio data</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Customer Economics</h3>
+  <div class="kpi g"><div class="l">CAC</div><div class="n">1,250</div><div class="u">BDT</div></div>
+  <div class="kpi w"><div class="l">CLV</div><div class="n">18,500</div><div class="u">BDT</div></div>
+  <div class="kpi n"><div class="l">ROMI</div><div class="n">14.8</div><div class="u">Ratio</div></div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Market Share / ROI / ROMI</h3>
+  <table>
+    <tr><th>Segment</th><th>Market Share %</th><th>ROI</th><th>ROMI</th></tr>
+    <tr><td>Premium</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>Standard</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>Value</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+  </table>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Replace with actual market share data</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Media Presence</h3>
+  <div class="kpi g"><div class="l">SOV %</div><div class="n">28.5</div><div class="u">Share of Voice</div></div>
+  <div class="kpi w"><div class="l">SOT</div><div class="n">42</div><div class="u">Contacts (000)</div></div>
+  <div class="kpi n"><div class="l">TRP</div><div class="n">1,250</div><div class="u">Thousand Rating Points</div></div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Top Campaigns</h3>
+  <table>
+    <tr><th>Campaign</th><th>Budget (Cr)</th><th>Rev (Cr)</th><th>Ach %</th></tr>
+    <tr><td>Campaign A</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>Campaign B</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>Campaign C</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+  </table>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Add top campaign data</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Brand Health</h3>
+  <div class="kpi g"><div class="l">Brand Score</div><div class="n">72</div><div class="u">/100</div></div>
+  <div class="kpi w"><div class="l">Awareness</div><div class="n">65</div><div class="u">% recalled</div></div>
+  <div class="kpi n"><div class="l">Consideration</div><div class="n">48</div><div class="u">% consideration</div></div>
+</div>
+
+<!-- Marketing SOP Analytics Tab -->
+<div id="tab-sop" class="tab-pane">
+  <h3 style="margin:0 0 12px 0; font-size:14px; color:var(--text-dim);">Standard Metrics Strip</h3>
+  <div class="kpi g"><div class="l">Service Level</div><div class="n">95</div><div class="u">% on-time</div></div>
+  <div class="kpi w"><div class="l">Order Accuracy</div><div class="n">93</div><div class="u">% correct</div></div>
+  <div class="kpi n"><div class="l">Fill Rate</div><div class="n">91</div><div class="u">% stocked</div></div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">SOP Cards by Function</h3>
+  <div style="display:flex; flex-wrap:wrap; gap:12px;">
+    <div class="kpi g" style="width:200px;"><div class="l">Production SOP</div><div class="n">8.5</div><div class="u">Score</div></div>
+    <div class="kpi w" style="width:200px;"><div class="l">Distribution SOP</div><div class="n">7.8</div><div class="u">Score</div></div>
+    <div class="kpi n" style="width:200px;"><div class="l">Quality SOP</div><div class="n">6.2</div><div class="u">Score</div></div>
+    <div class="kpi g" style="width:200px;"><div class="l">Delivery SOP</div><div class="n">9.1</div><div class="u">Score</div></div>
+  </div>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Add SOP owner, SLA, decision gate info</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">KPI Target vs Actual</h3>
+  <table>
+    <tr><th>KPI</th><th>Target</th><th>Actual</th><th>Gap</th><th>Status</th></tr>
+    <tr><td>Service Level</td><td class="t">98</td><td class="t">95</td><td class="t">-3</td><td><div class="status-dot --error"></div>Below</td></tr>
+    <tr><td>Order Accuracy</td><td class="t">95</td><td class="t">93</td><td class="t">-2</td><td><div class="status-dot --error"></div>Below</td></tr>
+    <tr><td>Fill Rate</td><td class="t">95</td><td class="t">91</td><td class="t">-4</td><td><div class="status-dot --error"></div>Below</td></tr>
+  </table>
+</div>
+
+<!-- Decisions to Actions Tab -->
+<div id="tab-actions" class="tab-pane">
+  <h3 style="margin:0 0 12px 0; font-size:14px; color:var(--text-dim);">Decision Owners + Action-Takers</h3>
+  <table>
+    <tr><th>Function</th><th>Decision Owner</th><th>Action-Taker</th><th>Status</th></tr>
+    <tr><td>Production</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>Distribution</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>Marketing</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+    <tr><td>Sales</td><td class="t">—</td><td class="t">—</td><td><div class="status-dot"></div>—</td></tr>
+  </table>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Populate from decisions data</div>
+
+  <h3 style="margin:16px 0 8px 0; font-size:14px; color:var(--text-dim);">Team Roster</h3>
+  <table>
+    <tr><th>Name</th><th>Role</th><th>SBU</th><th>Tenure</th></tr>
+    <tr><td>—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+    <tr><td>—</td><td class="t">—</td><td class="t">—</td><td class="t">—</td></tr>
+  </table>
+  <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">* Add team member details</div>
+</div>
+
+<footer>
+  Akij Readymix Control Tower • Confidential • Generated 2026-08-20
+</footer>
+
+<script>
+  // ========== TAB SWITCHING (ES5 for-loops) ==========
+  function switchTab(name){
+    var tabs=document.querySelectorAll('.tabbar .tab');
+    for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].dataset.tab===name);
+    var panes=document.querySelectorAll('.tab-pane');
+    for(var j=0;j<panes.length;j++) panes[j].style.display = (panes[j].id==='tab-'+name)?'block':'none';
+  }
+  for(var i=0;i<document.querySelectorAll('.tabbar .tab').length;i++){
+    document.querySelectorAll('.tabbar .tab')[i].addEventListener('click', function(){
+      switchTab(this.dataset.tab);
+    });
+  }
+
+  // ========== SUB-TAB SWITCHING (Revenue tab) ==========
+  function switchSubTab(name){
+    var tabs=document.querySelectorAll('.subtabbar .subtab');
+    for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].dataset.sub===name);
+    var panes=document.querySelectorAll('.sub-pane');
+    for(var j=0;j<panes.length;j++) panes[j].style.display = (panes[j].id==='sub-'+name)?'block':'none';
+  }
+  for(var i=0;i<document.querySelectorAll('.subtabbar .subtab').length;i++){
+    document.querySelectorAll('.subtabbar .subtab')[i].addEventListener('click', function(){
+      switchSubTab(this.dataset.sub);
+    });
+  }
+
+  // ========== KPI HELPERS ==========
+  function fmtCr(num){ return Number(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/','); }
+  function pct(num){ return Number(num).toFixed(1) + '%'; }
+  function cls(acc){
+    if(acc>=90) return 'pos';
+    if(acc>=70) return 'warn';
+    return 'neg';
+  }
+  function tone(acc){
+    if(acc>=90) return {cls:'g',dot:'#48d0b0'};
+    if(acc>=70) return {cls:'w',dot:'#f6c23e'};
+    return {cls:'n',dot:'#e87979'};
+  }
+
+  // ========== GENERATE FOOTER DATE ==========
+  document.getElementById('footer').innerText = 'Generated 2026-08-20';
+
+  // ========== CHART PLACEHOLDERS ==========
+  var legacyCtx = document.getElementById('legacy-cagr').getContext('2d');
+  new Chart(legacyCtx, {
+    type: 'line',
+    data: {
+      labels: ['FY 2022-23','FY 2023-24','FY 2024-25','FY 2025-26'],
+      datasets: [{ label: 'Revenue (Cr)', data: [0,0,0,365.47], borderColor: '#4a8fd4', backgroundColor: 'rgba(74,143,212,0.1)', fill: true, tension: 0.3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display:false }, tooltip: { enabled:false } }, scales: { y: { display:false } } }
+  });
+
+  var mtdCtx = document.getElementById('mtd-revenue').getContext('2d');
+  new Chart(mtdCtx, {
+    type: 'doughnut',
+    data: { labels: ['Revenue','NP'], datasets: [{ data: [35.70,0], backgroundColor: ['#4a8fd4','#6b7788'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position:'bottom' }, tooltip: { enabled:false } } }
+  });
+
+  var ytdCtx = document.getElementById('ytd-revenue').getContext('2d');
+  new Chart(ytdCtx, {
+    type: 'bar',
+    data: { labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], datasets: [{ label: 'Revenue (Cr)', data: [0,0,0,0,0,0,37.00,29.29,22.91,21.93,36.23,15.75], backgroundColor: '#4a8fd4' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display:false }, tooltip: { enabled:false } }, scales: { y: { display:false } } }
+  });
+
+  var annCtx = document.getElementById('annual-heatmap').getContext('2d');
+  new Chart(annCtx, {
+    type: 'bar',
+    data: { labels: ['FY 2022-23','FY 2023-24','FY 2024-25','FY 2025-26'], datasets: [{ label: 'Revenue (Cr)', data: [0,0,0,365.47], backgroundColor: '#4a8fd4' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display:false }, tooltip: { enabled:false } }, scales: { y: { display:false } } }
+  });
+
+  var clusterCtx = document.getElementById('cluster-performance').getContext('2d');
+  new Chart(clusterCtx, {
+    type: 'bar',
+    data: { labels: ['Zone A','Zone B','Zone C','Zone D'], datasets: [{ label: 'Revenue (Cr)', data: [0,0,0,0], backgroundColor: '#4a8fd4' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display:false }, tooltip: { enabled:false } }, scales: { y: { display:false } } }
+  });
+
+  var pCtx = document.getElementById('portfolio-heatmap').getContext('2d');
+  new Chart(pCtx, {
+    type: 'horizontalBar',
+    data: { labels: ['Premium','Standard','Value'], datasets: [{ label: 'Revenue (Cr)', data: [150,120,95], backgroundColor: ['#4a8fd4','#6b7788','#8b9aad'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display:false }, tooltip: { enabled:false } }, scales: { y: { display:false } } }
+  });
+</script>
+
+</body>
+</html>
