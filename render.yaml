@@ -5,6 +5,7 @@ services:
   - type: web
     name: akij-readymix-api
     runtime: python
+    pythonVersion: "3.11.9"   # pinned to match .python-version; avoids pyodbc build failures on 3.13+/3.14
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
