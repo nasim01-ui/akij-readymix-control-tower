@@ -1,15 +1,18 @@
+# Render Blueprint - automatically creates BOTH services on deploy.
+
 services:
+  # ==================== Backend API ====================
   - type: web
     name: akij-readymix-api
-    env: python
-    pythonVersion: "3.11.9"
+    runtime: python
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
+    healthCheckPath: /api/health
     plan: free
     envVars:
       - key: MSSQL_SERVER
-        sync: false
+        sync: false          # set the value in Render dashboard, never commit
       - key: MSSQL_PORT
         sync: false
       - key: MSSQL_USER
@@ -26,3 +29,13 @@ services:
         value: "False"
       - key: CORS_ORIGINS
         value: "*"
+
+  # ==================== Frontend Static Site ====================
+  - type: static
+    name: akij-readymix-dashboard
+    rootDir: frontend
+    buildCommand: ""          # pure HTML - no build step
+    publishPath: .
+    envVars:
+      - key: API_BASE
+        value: "https://akij-readymix-api.onrender.com"

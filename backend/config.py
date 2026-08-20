@@ -1,12 +1,12 @@
 """config.py - Central configuration for Akij Readymix Control Tower.
 
 Environment variables (never commit .env):
-  MSSQL_SERVER / MSSQL_PORT / MSSQL_USER / MSSQL_PASSWORD / MSSQL_DATABASE / MSSQL_BU_ID
+  MSSQL_SERVER / MSSQL_PORT / MSSQL_USER / MSSQL_PASSWORD / MSSQL_DATABASE / MSSQL_BU_ID / SECRET_KEY
 
-TABLE_MAP documents the real, verified DWH schema names.
-For AKIJ ERP the templates are compatible with sms.tblDeliveryHeaderArc and
-saas.empEmployeeBasicInfoArc (verified via INFORMATION_SCHEMA).
-Adjust TABLE_MAP only if the DWH schema changes.
+DATABASE_MAP documents the real, verified DWH schema names.
+For AKIJ ERP the templates are compatible with sms.tblDeliveryHeaderArc
+and saas.empEmployeeBasicInfoArc (verified via INFORMATION_SCHEMA).
+Adjust DATABASE_MAP only if the DWH schema changes.
 """
 
 import os
@@ -27,7 +27,7 @@ class Config:
     APP_VERSION = "1.0.0"
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     DEBUG = _env_bool("DEBUG", "False")
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")  # static-site origin(s)
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")  # frontend static-site origin(s)
 
     # --- MSSQL DWH ---
     MSSQL_SERVER = os.getenv("MSSQL_SERVER")
@@ -43,10 +43,10 @@ class Config:
 
 
 # ================================================================
-# TABLE_MAP - Single source of truth for DWH table/column names.
+# DATABASE_MAP - Single source of truth for DWH table/column names.
 # These are the REAL tables verified from the DWH INFORMATION_SCHEMA.
 # ================================================================
-TABLE_MAP = {
+DATABASE_MAP = {
     # Revenue / delivery transactions (verified schema)
     "transaction_table": "sms.tblDeliveryHeaderArc",
     "revenue_column": "numTotalNetValue",
@@ -57,7 +57,7 @@ TABLE_MAP = {
 
     # Customer dimension inside transaction table
     "customer_table": "sms.tblDeliveryHeaderArc",
-    "customer_name_column": "strSoldToPartnerName",
+    "customer_column": "strSoldToPartnerName",
 
     # SBU / zone (verified schema)
     "sbu_code_column": "strBusinessUnitCode",
@@ -80,6 +80,7 @@ TABLE_MAP = {
 # ================================================================
 # MOCK_FALLBACK - Used ONLY when the DWH is unreachable.
 # Contains last-known-real Akij Readymix figures (BU 175, FY 2025-26).
+# Shape mirrors the /api/dashboard contract 1:1.
 # ================================================================
 MOCK_FALLBACK = {
     "meta": {
@@ -92,12 +93,12 @@ MOCK_FALLBACK = {
         "asOf": "2026-06-30",
         "live": False,
     },
-    "group": {
-        "mtd": {"revA": 35.70, "revB": 35.70, "npA": 0, "npB": 0},
-        "ytd": {"revA": 365.47, "revB": 365.47, "npA": 0, "npB": 0},
-        "ann": {"revA": 365.47, "revB": 365.47, "npA": 0, "npB": 0},
+    "summary": {
+        "mtd": 35.70, "ytd": 365.47, "ann": 365.47,
+        "mtd_qty": 1142012, "ytd_qty": 12345678, "ann_qty": 12345678,
+        "as_of": "2026-06-30",
     },
-    "months": [
+    "monthly": [
         {"label": "Jul 2025", "revA": 35.70, "quantity": 1142012, "orders": 100},
         {"label": "Aug 2025", "revA": 36.10, "quantity": 1160576, "orders": 105},
         {"label": "Sep 2025", "revA": 32.09, "quantity": 1029688, "orders": 95},
@@ -111,29 +112,18 @@ MOCK_FALLBACK = {
         {"label": "May 2026", "revA": 36.23, "quantity": 956611, "orders": 95},
         {"label": "Jun 2026", "revA": 15.75, "quantity": 414397, "orders": 45},
     ],
-    "days": {},
-    "sbus": [
-        {"code": "READY-1", "name": "Dhaka North", "revA": 150.00, "quantity": 5000000},
-        {"code": "READY-2", "name": "Dhaka South", "revA": 120.00, "quantity": 4000000},
-        {"code": "READY-3", "name": "Chittagong", "revA": 80.00, "quantity": 2500000},
-        {"code": "READY-4", "name": "Khulna", "revA": 15.47, "quantity": 845678},
-    ],
-    "portfolio": {
-        "clusters": [
-            {"key": "A", "label": "Premium", "count": 2, "revCr": 270},
-            {"key": "B", "label": "Standard", "count": 1, "revCr": 80},
-            {"key": "C", "label": "Value", "count": 1, "revCr": 15},
-        ],
-        "totalSBUs": 4,
-        "trendLabels": ["Growing", "Stable", "Consolidating"],
-    },
-    "benchmarks": {"CLUSTER": 0},
     "customers": [
         {"customer": "AKij Essentials Ltd.", "revenue_cr": 746.76, "quantity": 2500000, "orders": 500},
         {"customer": "A One Polar Ltd (Unit-02)", "revenue_cr": 745.38, "quantity": 2400000, "orders": 480},
         {"customer": "Rangs Properties", "revenue_cr": 432.16, "quantity": 1500000, "orders": 300},
         {"customer": "Akij Textile Mills Ltd. (RMC)", "revenue_cr": 313.69, "quantity": 1200000, "orders": 250},
         {"customer": "Robintex (Bangladesh) Ltd.", "revenue_cr": 244.98, "quantity": 900000, "orders": 200},
+    ],
+    "sbus": [
+        {"code": "READY-1", "name": "Dhaka North", "revA": 150.00, "quantity": 5000000},
+        {"code": "READY-2", "name": "Dhaka South", "revA": 120.00, "quantity": 4000000},
+        {"code": "READY-3", "name": "Chittagong", "revA": 80.00, "quantity": 2500000},
+        {"code": "READY-4", "name": "Khulna", "revA": 15.47, "quantity": 845678},
     ],
     "kpi": {"service_level": 95, "order_accuracy": 93, "fill_rate": 91},
     "employees": [

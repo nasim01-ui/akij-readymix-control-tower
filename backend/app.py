@@ -2,18 +2,15 @@
 
 Endpoints:
   GET /api/health            -> liveness
-  GET /api/dashboard         -> full window.TOWER payload
+  GET /api/dashboard         -> {meta, summary, monthly, customers, sbus, kpi, employees}
   GET /api/debug             -> env var presence check (no secrets)
-
-Also serves the frontend from ../index.html (repo root) when hosted
-by the same Render Web Service.
 """
 
 import logging
 import os
 import traceback
 
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, jsonify
 from flask_cors import CORS
 
 from config import Config, MOCK_FALLBACK
@@ -27,7 +24,6 @@ app.config["SECRET_KEY"] = Config.SECRET_KEY
 CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS}})
 
 db = Database()
-FRONTEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root
 
 
 # ---------------- Error handling ----------------
@@ -56,7 +52,8 @@ def debug():
 
 @app.route("/api/dashboard")
 def dashboard():
-    """Full window.TOWER payload. Falls back to cached figures on DB failure."""
+    """Return {meta, summary, monthly, customers, sbus, kpi, employees}.
+    Falls back to cached figures on DWH failure."""
     fy = Config.DEFAULT_FY
     try:
         payload = db.build_dashboard(fy)
@@ -65,15 +62,10 @@ def dashboard():
     except Exception as e:
         logger.warning("DWH unavailable, serving fallback: %s", e)
         fallback = dict(MOCK_FALLBACK)
+        fallback["meta"] = dict(MOCK_FALLBACK["meta"])
         fallback["meta"]["live"] = False
         fallback["meta"]["error"] = str(e)
         return jsonify(fallback)
-
-
-# ---------------- Frontend (optional same-host hosting) ----------------
-@app.route("/")
-def index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
 
 
 if __name__ == "__main__":
