@@ -3,14 +3,23 @@
 Environment variables (never commit .env):
   MSSQL_SERVER / MSSQL_PORT / MSSQL_USER / MSSQL_PASSWORD / MSSQL_DATABASE / MSSQL_BU_ID / SECRET_KEY
 
-DATABASE_MAP documents the real, verified DWH schema names.
-For AKIJ ERP the templates are compatible with sms.tblDeliveryHeaderArc
-and saas.empEmployeeBasicInfoArc (verified via INFORMATION_SCHEMA).
-Adjust DATABASE_MAP only if the DWH schema changes.
+DATABASE_MAP is the SINGLE source of truth for DWH table/column names.
+All SQL in database.py reads ONLY from DATABASE_MAP - no hardcoded identifiers.
+
+AKIJ ERP NOTE:
+  The default mappings are the verified tables from the DWH INFORMATION_SCHEMA
+  (sms.tblDeliveryHeaderArc, saas.empEmployeeBasicInfoArc,
+   sms.tblEmployeeIncentiveArc).
+
+  The specification mentions AKIJ ERP "tblISTransaction". That table was NOT
+  verified/invented here. To point the app at tblISTransaction (once its real
+  columns are confirmed), change ONLY the DATABASE_MAP values below - no code
+  changes required. See the commented tblISTransaction placeholder.
 """
 
 import os
 from dotenv import load_dotenv
+from typing import Dict, List
 
 load_dotenv()  # loads ./backend/.env when present
 
@@ -41,13 +50,38 @@ class Config:
     API_PREFIX = "/api"
     DEFAULT_FY = "2025-2026"
 
+    # --- Fiscal calendar ---
+    # Akij Readymix runs a Jul-Jun fiscal year. If the source uses a different
+    # fiscal start, change FISCAL_START_MONTH (1-12). All month bucketing reads
+    # this, so nothing else needs to change.
+    FISCAL_START_MONTH = int(os.getenv("FISCAL_START_MONTH", "7"))  # July
+
+    # Whether transaction_table."date_column" represents the POSTING date
+    # (dteServerDate / dtePostingDate) vs a business/record date. This is a
+    # documentation/config flag - adjust DATE_IS_POSTING_DATE to match the source.
+    DATE_IS_POSTING_DATE = _env_bool("DATE_IS_POSTING_DATE", "true")
+
 
 # ================================================================
 # DATABASE_MAP - Single source of truth for DWH table/column names.
 # These are the REAL tables verified from the DWH INFORMATION_SCHEMA.
 # ================================================================
 DATABASE_MAP = {
-    # Revenue / delivery transactions (verified schema)
+    # ------------------------------------------------------------------
+    # Revenue / delivery transactions (verified schema).
+    #
+    # >>> AKIJ ERP tblISTransaction PLACEHOLDER <<<
+    #   To use tblISTransaction once its real columns are confirmed, replace
+    #   transaction_table and the *_column values below. For example (UNVERIFIED):
+    #     "transaction_table": "dbo.tblISTransaction",
+    #     "revenue_column": "numAmount",            # confirm sign/meaning
+    #     "quantity_column": "numQuantity",
+    #     "date_column": "dteTransactionDate",
+    #     "bu_column": "intBusinessUnitId",
+    #     "order_count_column": "intTransactionId",
+    #     "customer_column": "strCustomerName",
+    #   Only DATABASE_MAP edits needed - no code changes.
+    # ------------------------------------------------------------------
     "transaction_table": "sms.tblDeliveryHeaderArc",
     "revenue_column": "numTotalNetValue",
     "quantity_column": "numTotalDeliveryQuantity",
@@ -65,6 +99,7 @@ DATABASE_MAP = {
 
     # Employee master (verified schema)
     "employee_table": "saas.empEmployeeBasicInfoArc",
+    "employee_bu_column": "intBusinessUnitId",
     "employee_id_column": "intEmployeeBasicInfoId",
     "employee_name_column": "strEmployeeName",
     "employee_enroll_column": "strCardNumber",
@@ -75,6 +110,48 @@ DATABASE_MAP = {
     "incentive_table": "sms.tblEmployeeIncentiveArc",
     "employee_active_column": "isActive",
 }
+
+# Required keys that must exist in DATABASE_MAP at startup; validated in
+# config.validate_database_map(). If validation fails the app aborts with a
+# readable message instead of failing deep in a query.
+REQUIRED_DATABASE_MAP_KEYS: List[str] = [
+    "transaction_table",
+    "revenue_column",
+    "quantity_column",
+    "date_column",
+    "bu_column",
+    "order_count_column",
+    "customer_table",
+    "customer_column",
+    "sbu_code_column",
+    "sbu_name_column",
+    "employee_table",
+    "employee_bu_column",
+    "employee_id_column",
+    "employee_name_column",
+    "employee_enroll_column",
+    "employee_code_column",
+    "employee_designation_column",
+    "employee_active_column",
+]
+
+
+def validate_database_map(map_: Dict[str, str] = None, required: List[str] = None) -> None:
+    """Validate DATABASE_MAP has all required keys with non-empty values.
+
+    Raises ValueError with a readable message listing every missing field.
+    Called at app startup so config errors surface immediately.
+    """
+    m = map_ if map_ is not None else DATABASE_MAP
+    req = required if required is not None else REQUIRED_DATABASE_MAP_KEYS
+    missing = [k for k in req if not m.get(k)]
+    if missing:
+        raise ValueError(
+            "DATABASE_MAP is missing required key(s): {0}. "
+            "Add them to backend/config.py (see tblISTransaction placeholder).".format(
+                ", ".join(missing)
+            )
+        )
 
 
 # ================================================================

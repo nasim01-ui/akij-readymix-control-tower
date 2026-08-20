@@ -7,6 +7,7 @@ Hybrid strategy:
 Note: DWH firewall must allow Render outbound IPs to reach REDACTED_SERVER:1433.
 """
 
+import logging
 import os
 from datetime import date
 from typing import List, Dict, Any
@@ -58,10 +59,23 @@ class Database:
         except Exception:
             return 0.0
 
-    @staticmethod
-    def _fy_bounds(fy: str):
+    def _fy_bounds(self, fy: str):
+        """Return (start, end) for a fiscal year string like '2025-2026'.
+
+        Fiscal start month comes from Config.FISCAL_START_MONTH (default 7 = July),
+        and the end is start month - 1 of the following year. This keeps all
+        month bucketing driven by configuration rather than hardcoding Jul-Jun.
+        """
         y1 = int(fy.split("-")[0])
-        return date(y1, 7, 1), date(y1 + 1, 6, 30)
+        sm = Config.FISCAL_START_MONTH  # 1..12
+        start = date(y1, sm, 1)
+        # end = start of next fiscal year - 1 day
+        end_year, end_month = (y1 + 1, sm - 1) if sm > 1 else (y1 + 1, 12)
+        end = date(end_year, end_month, 28)  # 28 is safe for every month; truncated below
+        import calendar
+        last_day = calendar.monthrange(end_year, end_month)[1]
+        end = date(end_year, end_month, last_day)
+        return start, end
 
     # ============================================================
     # Query templates (all read from DATABASE_MAP)
@@ -190,7 +204,7 @@ class Database:
             f"{DBM['employee_enroll_column']} AS enroll, {DBM['employee_code_column']} AS code, "
             f"{DBM['employee_designation_column']} AS designation "
             f"FROM {DBM['employee_table']} "
-            f"WHERE intBusinessUnitId = ? AND {DBM['employee_active_column']} = 1 "
+            f"WHERE {DBM['employee_bu_column']} = ? AND {DBM['employee_active_column']} = 1 "
             f"ORDER BY {DBM['employee_name_column']}",
             (limit, self.bu_id),
         )
@@ -203,8 +217,37 @@ class Database:
     def build_dashboard(self, fy: str = Config.DEFAULT_FY) -> Dict[str, Any]:
         """Assemble the complete payload:
         {meta, summary, monthly, customers, sbus, kpi, employees}
+
+        Per-section fallback: if a live query returns empty/None, the safe
+        baseline value from MOCK_FALLBACK is used so no tab is left blank.
+        Missing sections are logged so they can be investigated against the DWH.
         """
+        logger = logging.getLogger(__name__)
+
         summary = self.get_summary(fy)
+        monthly = self.get_monthly_sales(fy)
+        customers = self.get_top_customers(5)
+        sbus = self.get_sbu_performance(fy)
+        kpi = self.get_kpi()
+        employees = self.get_employees(50)
+
+        # Per-section safety net - never return an empty section.
+        if not monthly:
+            monthly = MOCK_FALLBACK["monthly"]
+            logger.warning("get_monthly_sales returned empty - using baseline fallback")
+        if not customers:
+            customers = MOCK_FALLBACK["customers"]
+            logger.warning("get_top_customers returned empty - using baseline fallback")
+        if not sbus:
+            sbus = MOCK_FALLBACK["sbus"]
+            logger.warning("get_sbu_performance returned empty - using baseline fallback")
+        if not kpi or not kpi.get("service_level"):
+            kpi = MOCK_FALLBACK["kpi"]
+            logger.warning("get_kpi returned incomplete - using baseline fallback")
+        if not employees:
+            employees = MOCK_FALLBACK["employees"]
+            logger.warning("get_employees returned empty - using baseline fallback")
+
         return {
             "meta": {
                 "title": Config.APP_NAME,
@@ -213,12 +256,12 @@ class Database:
                 "currency": "BDT",
                 "unit": "Cr",
                 "source": f"DWH {DBM['transaction_table']}",
-                "asOf": summary.get("as_of"),
+                "asOf": summary.get("as_of") if summary else MOCK_FALLBACK["meta"]["asOf"],
             },
             "summary": summary,
-            "monthly": self.get_monthly_sales(fy),
-            "customers": self.get_top_customers(5),
-            "sbus": self.get_sbu_performance(fy),
-            "kpi": self.get_kpi(),
-            "employees": self.get_employees(50),
+            "monthly": monthly,
+            "customers": customers,
+            "sbus": sbus,
+            "kpi": kpi,
+            "employees": employees,
         }

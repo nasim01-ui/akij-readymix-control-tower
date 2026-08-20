@@ -225,11 +225,24 @@ async function fetchDashboard(){
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
     if (data && (data.summary || data.meta)) {
-      window.TOWER = Object.assign({}, window.TOWER, data);
+      /* Merge defensively: only overwrite a section if the API returned a
+         non-empty value, so a live-but-partial payload never blanks a tab
+         that already has baseline data. */
+      var merged = Object.assign({}, window.TOWER);
+      var keys = ['summary','monthly','customers','sbus','kpi','employees'];
+      for (var i=0;i<keys.length;i++){
+        var k = keys[i];
+        if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
+          var v = data[k];
+          var empty = (Array.isArray(v) && v.length === 0) ||
+                      (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+          if (!empty) { merged[k] = v; }
+          else { console.warn('API returned empty section:', k, '- keeping baseline'); }
+        }
+      }
+      if (data.meta) merged.meta = Object.assign({}, window.TOWER.meta, data.meta);
+      window.TOWER = merged;
       T = window.TOWER;
-      if (!T.customers) T.customers = [];
-      if (!T.kpi) T.kpi = {};
-      if (!T.employees) T.employees = [];
       document.getElementById('last-updated').textContent = 'Live DWH' + (T.meta.asOf ? ' • as of ' + new Date(T.meta.asOf).toLocaleDateString() : '');
       return true;
     }

@@ -13,8 +13,12 @@ import traceback
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from config import Config, MOCK_FALLBACK
+from config import Config, MOCK_FALLBACK, validate_database_map
 from database import Database
+
+# Validate DATABASE_MAP at startup so config errors surface immediately
+# with a readable message instead of failing inside a SQL query.
+validate_database_map()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,6 +38,12 @@ def internal_error(error):
 
 
 # ---------------- API endpoints ----------------
+@app.route("/health")
+def simple_health():
+    """Simple liveness probe (independent of /api prefix)."""
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok", "service": Config.APP_NAME, "version": Config.APP_VERSION})
