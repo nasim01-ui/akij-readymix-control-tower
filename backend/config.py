@@ -203,6 +203,14 @@ MOCK_FALLBACK = {
         {"code": "READY-4", "name": "Khulna", "revA": 15.47, "quantity": 845678},
     ],
     "kpi": {"service_level": 95, "order_accuracy": 93, "fill_rate": 91},
+    "marketing": {
+        "cac": 12.50,
+        "clv": 48.10,
+        "romi": 2.75,
+        "customers": 940,
+        "orders": 5136,
+        "note": "baseline revenue-proxy; real spend table needed for classic CAC/CLV/ROMI",
+    },
     "employees": [
         {"id": 1, "name": "John Doe", "enroll": "12345", "code": "MGR-001", "designation": "Manager"},
         {"id": 2, "name": "Jane Smith", "enroll": "67890", "code": "SUP-002", "designation": "Supervisor"},

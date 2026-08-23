@@ -28,13 +28,31 @@ class Database:
     # ---------------- connection ----------------
     def _conn_str(self) -> str:
         return (
-            f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+            f"DRIVER={{{self._pick_driver()}}};"
             f"SERVER={Config.MSSQL_SERVER},{Config.MSSQL_PORT};"
             f"DATABASE={Config.MSSQL_DATABASE};"
             f"UID={Config.MSSQL_USER};"
             f"PWD={Config.MSSQL_PASSWORD};"
-            f"Encrypt=yes;TrustServerCertificate=yes;"
+            f"Encrypt={'yes;TrustServerCertificate=yes' if self._odbc_modern() else 'no'};"
         )
+
+    @staticmethod
+    def _pick_driver() -> str:
+        """Pick an installed SQL Server ODBC driver: prefer ODBC 18/17, else legacy."""
+        try:
+            drivers = pyodbc.drivers()
+        except Exception:
+            drivers = []
+        for pref in ("ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server",
+                     "SQL Server Native Client 11.0", "SQL Server"):
+            for d in drivers:
+                if d.lower().startswith(pref.lower()):
+                    return d
+        return drivers[0] if drivers else "ODBC Driver 18 for SQL Server"
+
+    @staticmethod
+    def _odbc_modern() -> bool:
+        return Database._pick_driver().lower().startswith("odbc driver")
 
     def _connect(self):
         return pyodbc.connect(self._conn_str(), timeout=30)
@@ -210,6 +228,45 @@ class Database:
         )
         return rows
 
+    def get_marketing_metrics(self, fy: str = Config.DEFAULT_FY) -> Dict[str, Any]:
+        """CAC / CLV / ROMI computed from the actual DWH delivery data.
+
+        NOTE: the DWH has no marketing-spend table mapped for BU 175 yet, so the
+        classic cost formulas cannot use real ad-spend. These are revenue-based
+        proxies derived from real delivery data:
+          - CAC  : average revenue per new/unique customer (acquisition level)
+          - CLV  : average lifetime revenue per customer
+          - ROMI : revenue generated per order (marketing efficiency proxy)
+        Replace these formulas in config when a real spend table is added.
+        """
+        fy_s, fy_e = self._fy_bounds(fy)
+        rows = self._query(
+            f"SELECT COUNT(DISTINCT {DBM['customer_column']}) AS customers, "
+            f"COUNT(*) AS orders, "
+            f"SUM(ISNULL({DBM['revenue_column']},0)) AS revenue, "
+            f"SUM(ISNULL({DBM['quantity_column']},0)) AS qty "
+            f"FROM {DBM['transaction_table']} "
+            f"WHERE {DBM['bu_column']} = ? AND {DBM['date_column']} BETWEEN ? AND ?",
+            (self.bu_id, fy_s, fy_e),
+        )
+        r = rows[0] if rows else {}
+        customers = r.get("customers", 0) or 0
+        orders = r.get("orders", 0) or 0
+        revenue = r.get("revenue", 0) or 0
+
+        cac = revenue / customers if customers else 0        # BDT per customer
+        clv = revenue / customers if customers else 0         # BDT per customer
+        romi = revenue / orders if orders else 0              # BDT per order
+
+        return {
+            "cac": round(cac / 1_000_000, 2),   # in Cr
+            "clv": round(clv / 1_000_000, 2),   # in Cr
+            "romi": round(romi / 1_000_000, 3), # in Cr
+            "customers": customers,
+            "orders": orders,
+            "note": "revenue-based proxy; real spend table needed for classic CAC/CLV/ROMI",
+        }
+
     # ============================================================
     # Full dashboard payload (matches /api/dashboard contract)
     # ============================================================
@@ -230,6 +287,7 @@ class Database:
         sbus = self.get_sbu_performance(fy)
         kpi = self.get_kpi()
         employees = self.get_employees(50)
+        marketing = self.get_marketing_metrics(fy)
 
         # Per-section safety net - never return an empty section.
         if not monthly:
@@ -247,6 +305,9 @@ class Database:
         if not employees:
             employees = MOCK_FALLBACK["employees"]
             logger.warning("get_employees returned empty - using baseline fallback")
+        if not marketing or not marketing.get("cac"):
+            marketing = MOCK_FALLBACK["marketing"]
+            logger.warning("get_marketing_metrics returned empty - using baseline fallback")
 
         return {
             "meta": {
@@ -263,5 +324,6 @@ class Database:
             "customers": customers,
             "sbus": sbus,
             "kpi": kpi,
+            "marketing": marketing,
             "employees": employees,
         }

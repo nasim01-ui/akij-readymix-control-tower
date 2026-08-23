@@ -139,9 +139,9 @@ window.API_BASE = "https://akij-readymix-api.onrender.com";
 <!-- Marketing Tab -->
 <div id="tab-control" class="tab-pane">
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
-<div class="kpi g"><div class="l">CAC</div><div class="n">1,250</div><div class="u">BDT</div></div>
-<div class="kpi w"><div class="l">CLV</div><div class="n">18,500</div><div class="u">BDT</div></div>
-<div class="kpi n"><div class="l">ROMI</div><div class="n">14.8</div><div class="u">Ratio</div></div></div>
+<div class="kpi g"><div class="l">CAC</div><div class="n" id="v-cac">—</div><div class="u">BDT Cr</div></div>
+<div class="kpi w"><div class="l">CLV</div><div class="n" id="v-clv">—</div><div class="u">BDT Cr</div></div>
+<div class="kpi n"><div class="l">ROMI</div><div class="n" id="v-romi">—</div><div class="u">Ratio</div></div></div>
 <div class="chart-box"><canvas id="chart-sbu"></canvas></div>
 <div style="overflow-x:auto;margin-top:16px;"><table id="table-sbu"><thead><tr><th>SBU/Zone</th><th>Revenue (Cr)</th><th>Quantity</th></tr></thead><tbody></tbody></table></div></div>
 
@@ -229,7 +229,7 @@ async function fetchDashboard(){
          non-empty value, so a live-but-partial payload never blanks a tab
          that already has baseline data. */
       var merged = Object.assign({}, window.TOWER);
-      var keys = ['summary','monthly','customers','sbus','kpi','employees'];
+      var keys = ['summary','monthly','customers','sbus','kpi','marketing','employees'];
       for (var i=0;i<keys.length;i++){
         var k = keys[i];
         if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
@@ -305,12 +305,19 @@ function renderEmployees(){
     return '<tr><td>'+(x.name||'—')+'</td><td class="t">'+(x.enroll||'—')+'</td><td class="t">'+(x.designation||'—')+'</td><td class="t">'+(x.code||'—')+'</td></tr>';
   }).join('');
 }
+function renderMarketing(){
+  var m = T.marketing || {};
+  document.getElementById('v-cac').textContent  = m.cac  !== undefined ? fmtNum(m.cac) : '—';
+  document.getElementById('v-clv').textContent  = m.clv  !== undefined ? fmtNum(m.clv) : '—';
+  document.getElementById('v-romi').textContent = m.romi !== undefined ? fmtNum(m.romi) : '—';
+}
 function renderAll(){
   renderSummary();
   renderMonthly();
   renderCustomers();
   renderSBU();
   renderKPI();
+  renderMarketing();
   renderEmployees();
 }
 
