@@ -1,5 +1,5 @@
 Flask==3.0.0
 Flask-CORS==4.0.0
-pyodbc==5.0.1
+pymssql==2.3.13
 python-dotenv==1.0.1
 gunicorn==21.2.0

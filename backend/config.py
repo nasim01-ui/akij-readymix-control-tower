@@ -104,7 +104,7 @@ DATABASE_MAP = {
     "employee_name_column": "strEmployeeName",
     "employee_enroll_column": "strCardNumber",
     "employee_code_column": "strEmployeeCode",
-    "employee_designation_column": "strDesignation",
+    "employee_designation_column": "intDesignationId",  # FK id; name needs a join (not mapped yet)
 
     # Incentive / KPI source (verified schema)
     "incentive_table": "sms.tblEmployeeIncentiveArc",

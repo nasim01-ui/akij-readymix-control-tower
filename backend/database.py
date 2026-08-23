@@ -1,10 +1,15 @@
-"""database.py - MSSQL DWH access layer (pyodbc).
+"""database.py - MSSQL DWH access layer (pymssql).
 
 Hybrid strategy:
   1. Try live DWH query.
   2. On any failure app.py serves MOCK_FALLBACK from config.py.
 
-Note: DWH firewall must allow Render outbound IPs to reach REDACTED_SERVER:1433.
+pymssql bundles FreeTDS, so no external ODBC driver is required - it installs
+from a prebuilt wheel on Python 3.11, which is the reliable path on Render
+(no apt-get / Docker needed).
+
+Note: DWH firewall must allow the runtime outbound IPs to reach
+Config.MSSQL_SERVER:1433.
 """
 
 import logging
@@ -12,7 +17,7 @@ import os
 from datetime import date
 from typing import List, Dict, Any
 
-import pyodbc
+import pymssql
 
 from config import Config, DATABASE_MAP, MOCK_FALLBACK
 
@@ -26,45 +31,31 @@ class Database:
         self.bu_id = Config.MSSQL_BU_ID
 
     # ---------------- connection ----------------
-    def _conn_str(self) -> str:
-        return (
-            f"DRIVER={{{self._pick_driver()}}};"
-            f"SERVER={Config.MSSQL_SERVER},{Config.MSSQL_PORT};"
-            f"DATABASE={Config.MSSQL_DATABASE};"
-            f"UID={Config.MSSQL_USER};"
-            f"PWD={Config.MSSQL_PASSWORD};"
-            f"Encrypt={'yes;TrustServerCertificate=yes' if self._odbc_modern() else 'no'};"
+    def _conn(self):
+        return pymssql.connect(
+            server=Config.MSSQL_SERVER,
+            port=Config.MSSQL_PORT,
+            user=Config.MSSQL_USER,
+            password=Config.MSSQL_PASSWORD,
+            database=Config.MSSQL_DATABASE,
+            timeout=30,
+            login_timeout=30,
+            charset="utf8",
         )
 
-    @staticmethod
-    def _pick_driver() -> str:
-        """Pick an installed SQL Server ODBC driver: prefer ODBC 18/17, else legacy."""
-        try:
-            drivers = pyodbc.drivers()
-        except Exception:
-            drivers = []
-        for pref in ("ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server",
-                     "SQL Server Native Client 11.0", "SQL Server"):
-            for d in drivers:
-                if d.lower().startswith(pref.lower()):
-                    return d
-        return drivers[0] if drivers else "ODBC Driver 18 for SQL Server"
-
-    @staticmethod
-    def _odbc_modern() -> bool:
-        return Database._pick_driver().lower().startswith("odbc driver")
-
-    def _connect(self):
-        return pyodbc.connect(self._conn_str(), timeout=30)
-
     def _query(self, sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
-        """Run SELECT, return list of dicts."""
-        conn = self._connect()
+        """Run SELECT, return list of dicts.
+
+        pymssql uses %s placeholders; the query templates use ? for clarity,
+        so convert ? -> %s here (all ? are positional data-params, never SQL
+        identifiers - identifiers come from DATABASE_MAP at build time).
+        """
+        sql = sql.replace("?", "%s")
+        conn = self._conn()
         try:
-            cur = conn.cursor()
+            cur = conn.cursor(as_dict=True)
             cur.execute(sql, params)
-            cols = [c[0] for c in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return cur.fetchall()
         finally:
             conn.close()
 
