@@ -256,9 +256,16 @@
         <div class="card"><div class="chart-wrap"><canvas id="chart-cac-clv"></canvas></div></div>
       </section>
       <section class="block">
-        <div class="block-head"><h2>Market Share</h2><div class="note">Ready-mix concrete, national %</div></div>
+        <div class="block-head"><h2>Market Share</h2><div class="note">Ready-mix concrete, actual</div></div>
         <div class="grid g4" id="mkt-share-kpis"></div>
         <div class="card" style="margin-top:12px;"><div class="chart-wrap"><canvas id="chart-share"></canvas></div></div>
+        <div class="card" style="margin-top:12px;">
+          <h3>Competitor Market Share — Jul 2025 to Mar 2026</h3>
+          <table>
+            <thead><tr><th>Company</th><th class="num">Sales (cft)</th><th class="num">Share</th></tr></thead>
+            <tbody id="mkt-share-comp"></tbody>
+          </table>
+        </div>
       </section>
       <section class="block">
         <div class="block-head"><h2>SBU / Cluster Performance</h2></div>
@@ -341,14 +348,27 @@ window.TOWER = {
   kpi: { service_level:95, order_accuracy:93, fill_rate:91, total_orders:238417, total_revenue_cr:1643.44, total_qty:52223928 },
   marketing: { cac:5.86, clv:5.86, romi:0.072, customers:624, orders:51064, note:"revenue-based proxy",
     marketShare: {
-      national: "8.6%",
-      byCluster: [
-        {cluster:"Dhaka", share:12.4},
-        {cluster:"Chattogram", share:7.1},
-        {cluster:"North/West", share:5.9}
+      national: "9.99%",
+      period: "Jul 2025 – Mar 2026",
+      totalMarketCft: 85050000,
+      akijCft: 8500000,
+      competitors: [
+        {name:"Shah Cement RMC", share:22.93, cft:19500000},
+        {name:"NDE", share:18.05, cft:15350000},
+        {name:"Bashundhora RMC", share:17.05, cft:14500000},
+        {name:"Crown RMC", share:16.46, cft:14000000},
+        {name:"Akij RMC", share:9.99, cft:8500000},
+        {name:"ABC RMC", share:6.70, cft:5700000},
+        {name:"Concord RMC", share:5.88, cft:5000000},
+        {name:"Mir RMC", share:2.94, cft:2500000}
       ],
-      trendLabels: ["FY22","FY23","FY24","FY25","FY26"],
-      trend: [9.1, 8.8, 8.7, 8.5, 8.6]
+      trendLabels: ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26","Mar-26","Apr-26","May-26"],
+      trend: [13.45,15.33,13.80,12.80,13.16,15.09,14.59,14.07,13.10,13.01,11.47,12.25,12.30,11.07,9.63,8.85,10.79],
+      recent: [
+        {month:"May-26", share:9.59},
+        {month:"Jun-26", share:8.94},
+        {month:"Jul-26", share:10.02}
+      ]
     } },
   employees: [
     {id:562861,name:"Md.Moniruzzaman",enroll:"1359",code:"ACRMC-1359",designation:1436},
@@ -526,15 +546,23 @@ function renderTower(){
   /* -- MARKET SHARE -- */
   var ms = (T.marketing||{}).marketShare || {};
   var msk = document.getElementById('mkt-share-kpis'); msk.innerHTML='';
-  [{l:'National Share', n:ms.national||'—', u:'ready-mix concrete', tone:'g'},
-   {l:'Top Cluster', n:(ms.byCluster&&ms.byCluster[0])? ms.byCluster[0].share+'%':'—', u:'highest share', tone:'g'},
-   {l:'Clusters', n:(ms.byCluster||[]).length, u:'covered', tone:'a'}
+  [{l:'Akij RMC Share', n:ms.national||'—', u:ms.period||'', tone:ms.national&&parseFloat(ms.national)>90?'a':'g'},
+   {l:'Total Market', n:fmtNum(ms.totalMarketCft)+' cft', u:'Jul25–Mar26', tone:'g'},
+   {l:'Akij Volume', n:fmtNum(ms.akijCft)+' cft', u:'same period', tone:'a'},
+   {l:'Top Competitor', n:(ms.competitors&&ms.competitors[0])?ms.competitors[0].name:'—', u:'share leader', tone:'a'}
   ].forEach(function(k){ msk.innerHTML += '<div class="kpi '+k.tone+'"><div class="l">'+k.l+'</div><div class="n">'+k.n+'</div><div class="u">'+k.u+'</div></div>'; });
-  mkChart('chart-share', { type:'bar',
-    data:{ labels:(ms.trendLabels||[]), datasets:[{ label:'Share %', data:(ms.trend||[]), backgroundColor:'#3fb37f', borderRadius:4, maxBarThickness:30 }]},
+  mkChart('chart-share', { type:'line',
+    data:{ labels:(ms.trendLabels||[]), datasets:[{ label:'Akij Share %', data:(ms.trend||[]), borderColor:'#3fb37f', backgroundColor:'rgba(63,179,127,.12)', fill:true, tension:.35, pointRadius:2 }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{display:false}, ticks:{color:'#9aa6b5'}}, y:{grid:{color:'#1c2632'}, ticks:{color:'#9aa6b5'}} } }
+      scales:{ x:{grid:{display:false}, ticks:{color:'#9aa6b5', maxTicksLimit:10}}, y:{grid:{color:'#1c2632'}, ticks:{color:'#9aa6b5'}} } }
   });
+  var msc = document.getElementById('mkt-share-comp'); 
+  if (msc) { msc.innerHTML='';
+    (ms.competitors||[]).slice().sort(function(a,b){return b.share-a.share;}).forEach(function(c){
+      msc.innerHTML += '<tr><td>'+c.name+'</td><td class="num">'+fmtNum(c.cft)+'</td><td class="num">'+c.share+'%</td>';
+    });
+    msc.innerHTML += '<tr style="background-color:#f4f7fa;"><td>Total Market</td><td class="num">'+fmtNum(ms.totalMarketCft)+'</td><td class="num">100%</td></tr>';
+  }
 
   /* -- SOP -- */
   var k = T.kpi||{};
