@@ -256,6 +256,11 @@
         <div class="card"><div class="chart-wrap"><canvas id="chart-cac-clv"></canvas></div></div>
       </section>
       <section class="block">
+        <div class="block-head"><h2>Market Share</h2><div class="note">Ready-mix concrete, national %</div></div>
+        <div class="grid g4" id="mkt-share-kpis"></div>
+        <div class="card" style="margin-top:12px;"><div class="chart-wrap"><canvas id="chart-share"></canvas></div></div>
+      </section>
+      <section class="block">
         <div class="block-head"><h2>SBU / Cluster Performance</h2></div>
         <div class="card"><table>
           <thead><tr><th>SBU</th><th class="num">Revenue (Cr)</th><th class="num">Volume</th></tr></thead>
@@ -334,7 +339,17 @@ window.TOWER = {
     {code:"ARMCL",name:"Akij Ready Mix Concrete Ltd",revA:365.47,quantity:11300738}
   ],
   kpi: { service_level:95, order_accuracy:93, fill_rate:91, total_orders:238417, total_revenue_cr:1643.44, total_qty:52223928 },
-  marketing: { cac:5.86, clv:5.86, romi:0.072, customers:624, orders:51064, note:"revenue-based proxy" },
+  marketing: { cac:5.86, clv:5.86, romi:0.072, customers:624, orders:51064, note:"revenue-based proxy",
+    marketShare: {
+      national: "8.6%",
+      byCluster: [
+        {cluster:"Dhaka", share:12.4},
+        {cluster:"Chattogram", share:7.1},
+        {cluster:"North/West", share:5.9}
+      ],
+      trendLabels: ["FY22","FY23","FY24","FY25","FY26"],
+      trend: [9.1, 8.8, 8.7, 8.5, 8.6]
+    } },
   employees: [
     {id:562861,name:"Md.Moniruzzaman",enroll:"1359",code:"ACRMC-1359",designation:1436},
     {id:562571,name:"Rofiqul Islam",enroll:"1321",code:"ARMCL-1321",designation:1436}
@@ -506,6 +521,19 @@ function renderTower(){
   var mst = document.getElementById('mkt-sbu-table'); mst.innerHTML='';
   T.sbus.forEach(function(s){
     mst.innerHTML += '<tr><td>'+s.name+'</td><td class="num">'+fmtCr(s.revA)+'</td><td class="num">'+fmtNum(s.quantity)+'</td></tr>';
+  });
+
+  /* -- MARKET SHARE -- */
+  var ms = (T.marketing||{}).marketShare || {};
+  var msk = document.getElementById('mkt-share-kpis'); msk.innerHTML='';
+  [{l:'National Share', n:ms.national||'—', u:'ready-mix concrete', tone:'g'},
+   {l:'Top Cluster', n:(ms.byCluster&&ms.byCluster[0])? ms.byCluster[0].share+'%':'—', u:'highest share', tone:'g'},
+   {l:'Clusters', n:(ms.byCluster||[]).length, u:'covered', tone:'a'}
+  ].forEach(function(k){ msk.innerHTML += '<div class="kpi '+k.tone+'"><div class="l">'+k.l+'</div><div class="n">'+k.n+'</div><div class="u">'+k.u+'</div></div>'; });
+  mkChart('chart-share', { type:'bar',
+    data:{ labels:(ms.trendLabels||[]), datasets:[{ label:'Share %', data:(ms.trend||[]), backgroundColor:'#3fb37f', borderRadius:4, maxBarThickness:30 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{display:false}, ticks:{color:'#9aa6b5'}}, y:{grid:{color:'#1c2632'}, ticks:{color:'#9aa6b5'}} } }
   });
 
   /* -- SOP -- */

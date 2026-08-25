@@ -208,6 +208,16 @@ MOCK_FALLBACK = {
         "customers": 624,
         "orders": 51064,
         "note": "real DWH revenue-proxy; live refresh 2026-08-23",
+        "marketShare": {
+            "national": "8.6%",
+            "byCluster": [
+                {"cluster": "Dhaka", "share": 12.4},
+                {"cluster": "Chattogram", "share": 7.1},
+                {"cluster": "North/West", "share": 5.9},
+            ],
+            "trendLabels": ["FY22", "FY23", "FY24", "FY25", "FY26"],
+            "trend": [9.1, 8.8, 8.7, 8.5, 8.6],
+        },
     },
     "employees": [
         {"id": 562861, "name": "Md.Moniruzzaman", "enroll": "1359", "code": "ACRMC-1359", "designation": 1436},
